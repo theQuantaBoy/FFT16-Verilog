@@ -64,10 +64,10 @@ module FFT_2pt #(parameter DW = 16) (
 endmodule
 
 // ═══════════════════════════════════════════════════════════════════
-// TESTBENCH  (clean string handling, guaranteed alignment)
-// Compile: iverilog -D TEST_FFT -o sim FFT_2pt.v && vvp sim
+// TESTBENCH (Re-formatted to match 4pt, 8pt, and 16pt console style)
+// Compile: iverilog -g2012 -D TEST_FFT_2PT -o sim FFT_2pt.v && vvp sim
 // ═══════════════════════════════════════════════════════════════════
-`ifdef TEST_FFT
+`ifdef TEST_FFT_2PT
 module FFT_2pt_tb;
     reg  signed [15:0] A_re, A_im, B_re, B_im, W_re, W_im;
     wire signed [16:0] X_re, X_im, Y_re, Y_im;
@@ -90,27 +90,18 @@ module FFT_2pt_tb;
         q15_to_real = $itor(val) / 32768.0;
     endfunction
 
-    // ── Display one set of results (no string inputs) ────────────
+    // ── Unified Display Task matching higher-order modules ───────
     task display_result;
-        input real exp_X_re, exp_X_im, exp_Y_re, exp_Y_im;
-        input signed [16:0] got_X_re, got_X_im, got_Y_re, got_Y_im;
+        input real e0_r, e0_i, e1_r, e1_i;
         begin
-            // Expected
-            $write("    %-12s X=", "expected:");
-            $write("%+7.4f%+7.4fj  | Y=", exp_X_re, exp_X_im);
-            $write("%+7.4f%+7.4fj\n", exp_Y_re, exp_Y_im);
-
-            // Got (float)
-            $write("    %-12s X=", "got (float):");
-            $write("%+7.4f%+7.4fj  | Y=",
-                   q15_to_real(got_X_re), q15_to_real(got_X_im));
-            $write("%+7.4f%+7.4fj\n",
-                   q15_to_real(got_Y_re), q15_to_real(got_Y_im));
-
-            // Got (Q15)
-            $write("    %-12s X=", "got (Q15):");
-            $write("%+6d%+6dj    | Y=", got_X_re, got_X_im);
-            $write("%+6d%+6dj\n", got_Y_re, got_Y_im);
+            $display("    %-13s [0..1]: %+6.2f%+6.2fj | %+6.2f%+6.2fj", "expected:", e0_r, e0_i, e1_r, e1_i);
+                     
+            $display("    %-13s [0..1]: %+6.2f%+6.2fj | %+6.2f%+6.2fj", "got (float):", 
+                     q15_to_real(X_re), q15_to_real(X_im), 
+                     q15_to_real(Y_re), q15_to_real(Y_im));
+                     
+            $display("    %-13s [0..1]: %6d%6dj | %6d%6dj\n", "got (Q15):", 
+                     X_re, X_im, Y_re, Y_im);
         end
     endtask
 
@@ -119,49 +110,44 @@ module FFT_2pt_tb;
         $dumpvars(0, FFT_2pt_tb);
 
         // ═════════════════════════════════════════════════════════
-        // TC1
+        // TC1 | Both Inputs +1.0, Twiddle = 1.0
         // ═════════════════════════════════════════════════════════
         A_re=POS1; A_im=ZERO; B_re=POS1; B_im=ZERO;
         W_re=POS1; W_im=ZERO; #10;
         $display("\nTC1 | A=1+0j  B=1+0j  W=1+0j");
-        display_result(2.0, 0.0,  0.0, 0.0,
-                       X_re, X_im, Y_re, Y_im);
+        display_result(2.0, 0.0,  0.0, 0.0);
 
         // ═════════════════════════════════════════════════════════
-        // TC2
+        // TC2 | B is Out-of-Phase (-1.0), Twiddle = 1.0
         // ═════════════════════════════════════════════════════════
         A_re=POS1; A_im=ZERO; B_re=NEG1; B_im=ZERO;
         W_re=POS1; W_im=ZERO; #10;
-        $display("\nTC2 | A=1+0j  B=-1+0j  W=1+0j");
-        display_result(0.0, 0.0,  2.0, 0.0,
-                       X_re, X_im, Y_re, Y_im);
+        $display("TC2 | A=1+0j  B=-1+0j  W=1+0j");
+        display_result(0.0, 0.0,  2.0, 0.0);
 
         // ═════════════════════════════════════════════════════════
-        // TC3
+        // TC3 | Complex Inputs, Twiddle = 1.0
         // ═════════════════════════════════════════════════════════
         A_re=POS1; A_im=POS1; B_re=POS1; B_im=NEG1;
         W_re=POS1; W_im=ZERO; #10;
-        $display("\nTC3 | A=1+j  B=1-j  W=1+0j");
-        display_result(2.0, 0.0,  0.0, 2.0,
-                       X_re, X_im, Y_re, Y_im);
+        $display("TC3 | A=1+j  B=1-j  W=1+0j");
+        display_result(2.0, 0.0,  0.0, 2.0);
 
         // ═════════════════════════════════════════════════════════
-        // TC4
+        // TC4 | Pure Imaginary Twiddle W = -j
         // ═════════════════════════════════════════════════════════
         A_re=POS1; A_im=ZERO; B_re=POS1; B_im=ZERO;
         W_re=ZERO; W_im=MONE; #10;
-        $display("\nTC4 | A=1+0j  B=1+0j  W=0-j  (e^{-jpi/2})");
-        display_result(1.0, -1.0,  1.0, 1.0,
-                       X_re, X_im, Y_re, Y_im);
+        $display("TC4 | A=1+0j  B=1+0j  W=0-j  (e^{-jpi/2})");
+        display_result(1.0, -1.0,  1.0, 1.0);
 
         // ═════════════════════════════════════════════════════════
-        // TC5
+        // TC5 | 45-degree Twiddle Rotation W = e^{-jpi/4}
         // ═════════════════════════════════════════════════════════
         A_re=POS1; A_im=ZERO; B_re=POS1; B_im=ZERO;
         W_re=COS45; W_im=-COS45; #10;
-        $display("\nTC5 | A=1+0j  B=1+0j  W=e^{-jpi/4}  (W_re=23170 W_im=-23170)");
-        display_result(1.70710678, -0.70710678,  0.29289322, 0.70710678,
-                       X_re, X_im, Y_re, Y_im);
+        $display("TC5 | A=1+0j  B=1+0j  W=e^{-jpi/4}");
+        display_result(1.71, -0.71,  0.29, 0.71);
 
         $finish;
     end
