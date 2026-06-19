@@ -1,4 +1,4 @@
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 // testbench.v — self-checking testbench for the 16-point FFT
 //
 // 6 test vectors, all real inputs, tolerance ±64 LSBs:
@@ -6,10 +6,10 @@
 //   TC4: Impulse at n=4 TC5: Cosine@bin2   TC6: Sawtooth
 //
 // Hierarchical:
-//   iverilog -g2012 -o sim testbench.v FFT_16pt.v FFT_8pt.v FFT_4pt.v FFT_2pt.v w_lut.v
+//   iverilog -o ../build/sim testbench.v FFT_16pt.v FFT_8pt.v FFT_4pt.v FFT_2pt.v w_lut.v && vvp ../build/sim
 // Flat (add -D USE_FLAT):
-//   iverilog -g2012 -D USE_FLAT -o sim testbench.v FFT_16pt_flat.v FFT_2pt.v w_lut.v
-// ═══════════════════════════════════════════════════════════════════
+//   iverilog -D USE_FLAT -o ../build/sim testbench.v FFT_16pt_flat.v FFT_2pt.v w_lut.v && vvp ../build/sim
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 `timescale 1ns/1ps
 

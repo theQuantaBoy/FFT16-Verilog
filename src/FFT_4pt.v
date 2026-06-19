@@ -72,9 +72,9 @@ module FFT_4pt #(parameter DW = 16) (
 endmodule
 
 
-// ── Testbench ───────────────────────────────────────────────────────────────────────────────
-// Compile: iverilog -D TEST_FFT_4PT -o build/sim FFT_4pt.v FFT_2pt.v w_lut.v && vvp buildsim
-// ────────────────────────────────────────────────────────────────────────────────────────────
+// ── Testbench ─────────────────────────────────────────────────────────────────────────────────────
+// Compile: iverilog -D TEST_FFT_4PT -o ../build/sim FFT_4pt.v FFT_2pt.v w_lut.v && vvp ../build/sim
+// ──────────────────────────────────────────────────────────────────────────────────────────────────
 `ifdef TEST_FFT_4PT
 module FFT_4pt_tb;
     // 16-bit inputs
