@@ -141,6 +141,7 @@ module FFT_8pt_tb;
 
     localparam signed [15:0] POS1 =  32767; // ≈ +1.0
     localparam signed [15:0] NEG1 = -32767; // ≈ -1.0
+    localparam signed [15:0] MONE = -32768;  // exact Q15 -1.0
     localparam signed [15:0] ZERO =      0;
 
     function real q15_to_real(input signed [18:0] val);

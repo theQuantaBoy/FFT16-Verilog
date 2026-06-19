@@ -96,7 +96,8 @@ module FFT_4pt_tb;
 
     // ── Q15 constants ────────────────────────────────────────────
     localparam signed [15:0] POS1 =  32767;  // ≈ +1.0
-    localparam signed [15:0] NEG1 = -32767;
+    localparam signed [15:0] NEG1 = -32767;  // ≈ -1.0
+    localparam signed [15:0] MONE = -32768;  // exact Q15 -1.0
     localparam signed [15:0] ZERO =      0;
 
     // ── Helper: Q15 → real (Scaled for 18-bit register) ──────────

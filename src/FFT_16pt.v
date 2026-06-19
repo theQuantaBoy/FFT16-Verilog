@@ -179,8 +179,9 @@ module FFT_16pt_tb;
         .out_re14(out_re14), .out_im14(out_im14), .out_re15(out_re15), .out_im15(out_im15)
     );
 
-    localparam signed [15:0] POS1 =  32767;
-    localparam signed [15:0] NEG1 = -32767;
+    localparam signed [15:0] POS1 =  32767; // ≈ +1.0
+    localparam signed [15:0] NEG1 = -32767; // ≈ -1.0
+    localparam signed [15:0] MONE = -32768;  // exact Q15 -1.0
     localparam signed [15:0] ZERO =      0;
 
     function real q15_to_real(input signed [19:0] val);
