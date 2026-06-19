@@ -41,9 +41,9 @@ module FFT_2pt #(parameter DW = 16) (
     end
 endmodule
 
-// ── Testbench ───────────────────────────────────────────────────────────────────
-// Compile: iverilog -D TEST_FFT_2PT -o ../build/sim FFT_2pt.v && vvp ../build/sim
-// ────────────────────────────────────────────────────────────────────────────────
+// ── Testbench ─────────────────────────────────────────────────────────────────
+// Compile: iverilog -D TEST_FFT_2PT -o build/sim src/FFT_2pt.v && vvp build/sim
+// ──────────────────────────────────────────────────────────────────────────────
 `ifdef TEST_FFT_2PT
 module FFT_2pt_tb;
     reg  signed [15:0] A_re, A_im, B_re, B_im, W_re, W_im;

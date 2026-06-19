@@ -114,9 +114,9 @@ module FFT_8pt #(parameter DW = 16) (
 endmodule
 
 
-// ── Testbench ───────────────────────────────────────────────────────────────────────────────────────────────
-// Compile: iverilog -D TEST_FFT_8PT -o ../build/sim FFT_8pt.v FFT_4pt.v FFT_2pt.v w_lut.v && vvp ../build/sim
-// ────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// ── Testbench ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+// Compile: iverilog -D TEST_FFT_8PT -o build/sim src/FFT_8pt.v src/FFT_4pt.v src/FFT_2pt.v src/w_lut.v && vvp build/sim
+// ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 `ifdef TEST_FFT_8PT
 module FFT_8pt_tb;
     reg signed [15:0] in_re0, in_im0, in_re1, in_im1, in_re2, in_im2, in_re3, in_im3;

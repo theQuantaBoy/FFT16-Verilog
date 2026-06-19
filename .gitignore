@@ -1,11 +1,12 @@
 
 # Ignore the entire build directory where simulation binaries live
-src/../build/
+src/build/
 build/
 
 # Ignore any rogue waveform files or logs if run outside the build folder
 *.vcd
 *.log
+test/inputs.hex
 
 # Ignore generic Icarus Verilog compiled output names if you use defaults
 a.out

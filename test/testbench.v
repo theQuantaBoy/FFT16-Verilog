@@ -6,9 +6,9 @@
 //   TC4: Impulse at n=4 TC5: Cosine@bin2   TC6: Sawtooth
 //
 // Hierarchical:
-//   iverilog -o ../build/sim testbench.v FFT_16pt.v FFT_8pt.v FFT_4pt.v FFT_2pt.v w_lut.v && vvp ../build/sim
+//   iverilog -o build/sim test/testbench.v src/FFT_16pt.v src/FFT_8pt.v src/FFT_4pt.v src/FFT_2pt.v src/w_lut.v
 // Flat (add -D USE_FLAT):
-//   iverilog -D USE_FLAT -o ../build/sim testbench.v FFT_16pt_flat.v FFT_2pt.v w_lut.v && vvp ../build/sim
+//   iverilog -D USE_FLAT -o build/sim test/testbench.v src/FFT_16pt_flat.v src/FFT_2pt.v src/w_lut.v
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 `timescale 1ns/1ps
