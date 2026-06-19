@@ -1,9 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════
-// FFT_4pt.v — 4-point Radix-2 DIT FFT (Structural Hierarchy)
+// FFT_4pt.v — structural 4-point FFT (Radix-2 DIT)
 //
-// Sub-modules required: FFT_2pt, w_lut
-// Input Width: DW bits (Default 16)
-// Output Width: DW+2 bits (Default 18) — Exact DFT, 0 overflow risk
+// Two stages of 2 FFT_2pt butterflies each.
+// Input: DW bits. Output: DW+2 bits. Requires: FFT_2pt, w_lut
 // ═══════════════════════════════════════════════════════════════════
 module FFT_4pt #(parameter DW = 16) (
     input  signed [DW-1:0] in_re0, in_im0,
@@ -73,10 +72,9 @@ module FFT_4pt #(parameter DW = 16) (
 endmodule
 
 
-// ═══════════════════════════════════════════════════════════════════
-// TESTBENCH  (clean string handling, exact Q15 multi-point display)
-// Compile: iverilog -D TEST_FFT_4PT -o sim FFT_4pt.v FFT_2pt.v && vvp sim
-// ═══════════════════════════════════════════════════════════════════
+// ── Testbench ───────────────────────────────────────────────────────────────────────────────
+// Compile: iverilog -D TEST_FFT_4PT -o build/sim FFT_4pt.v FFT_2pt.v w_lut.v && vvp buildsim
+// ────────────────────────────────────────────────────────────────────────────────────────────
 `ifdef TEST_FFT_4PT
 module FFT_4pt_tb;
     // 16-bit inputs
@@ -96,8 +94,7 @@ module FFT_4pt_tb;
 
     // ── Q15 constants ────────────────────────────────────────────
     localparam signed [15:0] POS1 =  32767;  // ≈ +1.0
-    localparam signed [15:0] NEG1 = -32767;  // ≈ -1.0
-    localparam signed [15:0] MONE = -32768;  // exact Q15 -1.0
+    localparam signed [15:0] NEG1 = -32767;
     localparam signed [15:0] ZERO =      0;
 
     // ── Helper: Q15 → real (Scaled for 18-bit register) ──────────

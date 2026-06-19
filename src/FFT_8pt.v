@@ -1,9 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════
-// FFT_8pt.v — 8-point Radix-2 DIT FFT (Structural Hierarchy)
+// FFT_8pt.v — structural 8-point FFT (Radix-2 DIT)
 //
-// Sub-modules required: FFT_2pt, FFT_4pt, w_lut
-// Input Width: DW bits (Default 16)
-// Output Width: DW+3 bits (Default 19) — Exact DFT, zero overflow risk
+// Two FFT_4pt sub-FFTs (even/odd) + 4 final butterflies.
+// Input: DW bits. Output: DW+3 bits. Requires: FFT_2pt, FFT_4pt, w_lut
 // ═══════════════════════════════════════════════════════════════════
 module FFT_8pt #(parameter DW = 16) (
     input  signed [DW-1:0] in_re0, in_im0,
@@ -115,9 +114,9 @@ module FFT_8pt #(parameter DW = 16) (
 endmodule
 
 
-// ═══════════════════════════════════════════════════════════════════
-// TESTBENCH (Splits 8-point display onto 2 rows for perfect alignment)
-// ═══════════════════════════════════════════════════════════════════
+// ── Testbench ─────────────────────────────────────────────────────────────────────────────────────────
+// Compile: iverilog -D TEST_FFT_8PT -o build/sim FFT_8pt.v FFT_4pt.v FFT_2pt.v w_lut.v && vvp build/sim
+// ──────────────────────────────────────────────────────────────────────────────────────────────────────
 `ifdef TEST_FFT_8PT
 module FFT_8pt_tb;
     reg signed [15:0] in_re0, in_im0, in_re1, in_im1, in_re2, in_im2, in_re3, in_im3;
@@ -141,7 +140,6 @@ module FFT_8pt_tb;
 
     localparam signed [15:0] POS1 =  32767; // ≈ +1.0
     localparam signed [15:0] NEG1 = -32767; // ≈ -1.0
-    localparam signed [15:0] MONE = -32768;  // exact Q15 -1.0
     localparam signed [15:0] ZERO =      0;
 
     function real q15_to_real(input signed [18:0] val);

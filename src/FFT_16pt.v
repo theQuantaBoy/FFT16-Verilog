@@ -1,9 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════
-// FFT_16pt.v — 16-point Radix-2 DIT FFT (Final Top-Level Structure)
+// FFT_16pt.v — structural 16-point FFT (Radix-2 DIT, hierarchical)
 //
-// Sub-modules required: FFT_2pt, FFT_4pt, FFT_8pt, w_lut
-// Input Width: DW bits (Default 16)
-// Output Width: DW+4 bits (Default 20) — Exact DFT, zero overflow risk
+// Two FFT_8pt sub-FFTs (even/odd) + 8 final butterflies.
+// Input: DW bits. Output: DW+4 bits. Requires: FFT_2pt, FFT_4pt, FFT_8pt, w_lut
 // ═══════════════════════════════════════════════════════════════════
 module FFT_16pt #(parameter DW = 16) (
     input  signed [DW-1:0] in_re0,  in_im0,  in_re1,  in_im1,
@@ -142,10 +141,9 @@ module FFT_16pt #(parameter DW = 16) (
 endmodule
 
 
-// ═══════════════════════════════════════════════════════════════════
-// TESTBENCH (Splits 16-point display onto 4 rows for perfect alignment)
+// ── Testbench ────────────────────────────────────────────────────
 // Compile: iverilog -g2012 -D TEST_FFT_16PT -o sim FFT_16pt.v FFT_8pt.v FFT_4pt.v FFT_2pt.v w_lut.v && vvp sim
-// ═══════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────
 `ifdef TEST_FFT_16PT
 module FFT_16pt_tb;
     reg signed [15:0] in_re0, in_im0, in_re1, in_im1, in_re2, in_im2, in_re3, in_im3;
@@ -179,9 +177,8 @@ module FFT_16pt_tb;
         .out_re14(out_re14), .out_im14(out_im14), .out_re15(out_re15), .out_im15(out_im15)
     );
 
-    localparam signed [15:0] POS1 =  32767; // ≈ +1.0
-    localparam signed [15:0] NEG1 = -32767; // ≈ -1.0
-    localparam signed [15:0] MONE = -32768;  // exact Q15 -1.0
+    localparam signed [15:0] POS1 =  32767;
+    localparam signed [15:0] NEG1 = -32767;
     localparam signed [15:0] ZERO =      0;
 
     function real q15_to_real(input signed [19:0] val);

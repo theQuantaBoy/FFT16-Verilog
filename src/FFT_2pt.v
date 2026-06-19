@@ -1,76 +1,49 @@
 // ═══════════════════════════════════════════════════════════════════
-// FFT_2pt.v — 2-point DFT butterfly, parameterized Q15 fixed-point
+// FFT_2pt.v — behavioral 2-point FFT butterfly (Radix-2 DIT)
 //
-// Interface
-//   Inputs  [DW-1:0]  A, B : complex operands in Q15
-//   Input   [15:0]    W    : twiddle factor in Q15, always |W|=1
-//   Outputs [DW:0]    X, Y : butterfly results, one guard bit wider
-//
-// Butterfly equations
-//   X = A + B·W
-//   Y = A − B·W
-//
-// Overflow guarantee
-//   Outputs are DW+1 bits. Verilog evaluates A+BW in the DW+1
-//   context of the output register, sign-extending A automatically.
-//   No overflow is possible regardless of input values.
-//
-// No precision loss
-//   No division or rounding in the adder stage. Only source of error
-//   is Q30→Q15 truncation in the complex multiplier (≤1 LSB, ~0.003%).
-//
-// Role in the 16-point hierarchy (log2(16) = 4 stages, DW grows by 1 each stage)
-//   FFT_4pt  stage 1: FFT_2pt #(DW=16) — inputs 16-bit,  outputs 17-bit
-//   FFT_4pt  stage 2: FFT_2pt #(DW=17) — inputs 17-bit,  outputs 18-bit
-//   FFT_8pt  stage 3: FFT_2pt #(DW=18) — inputs 18-bit,  outputs 19-bit
-//   FFT_16pt stage 4: FFT_2pt #(DW=19) — inputs 19-bit,  outputs 20-bit
-//
-//   This module is never instantiated flat with DW stepping 16→17→18→19.
-//   Those data widths are produced by the hierarchy: FFT_16pt instantiates
-//   two FFT_8pt, each of which instantiates two FFT_4pt, each of which
-//   instantiates two FFT_2pt at DW and two at DW+1.
-//
-//   The 20-bit final outputs hold exact integer DFT values (no 1/N scale).
-//   To recover 16-bit Q15 results, truncate bits [3:0] after the last stage.
+// X = A + B·W    Y = A − B·W    (complex arithmetic, Q15 twiddle)
+// Outputs are DW+1 bits to prevent overflow.
 // ═══════════════════════════════════════════════════════════════════
-
 module FFT_2pt #(parameter DW = 16) (
     input  signed [DW-1:0] A_re, A_im,
     input  signed [DW-1:0] B_re, B_im,
-    input  signed [15:0]   W_re, W_im,
+    input  signed [15:0]   W_re, W_im,     // twiddle: always Q15
 
-    output reg signed [DW:0] X_re, X_im,
+    output reg signed [DW:0] X_re, X_im,   // DW+1 bits: no overflow
     output reg signed [DW:0] Y_re, Y_im
 );
+    // Full-precision products: DW-bit data × 16-bit twiddle → DW+16 bits
     reg signed [DW+15:0] mul_re1, mul_re2, mul_im1, mul_im2;
-    reg signed [DW:0]    BW_re, BW_im;
+
+    // Complex product B×W, scaled back to Q15: fits in DW+1 bits
+    reg signed [DW:0] BW_re, BW_im;
 
     always @(*) begin
         // Complex multiply: BW = B × W
+        //   Re(BW) = B_re·W_re − B_im·W_im
+        //   Im(BW) = B_re·W_im + B_im·W_re
         mul_re1 = B_re * W_re;
         mul_re2 = B_im * W_im;
         mul_im1 = B_re * W_im;
         mul_im2 = B_im * W_re;
 
         // Scale Q(DW+15) → Q(DW) via arithmetic right-shift by 15.
-        // Truncates toward −∞ (floor), introducing ≤1 LSB error per multiply.
-        // Over 4 stages, accumulated quantization noise is ≤ ~32 LSBs.
+        // Truncates toward −∞ (floor): ≤1 LSB error per multiply.
+        // Over 4 FFT stages, accumulated quantization noise is ≤~32 LSBs.
         BW_re = (mul_re1 - mul_re2) >>> 15;
         BW_im = (mul_im1 + mul_im2) >>> 15;
 
-        // Butterfly outputs are DW+1 bits; sign-extension of A is implicit.
+        // Butterfly: DW+1 output context sign-extends A automatically
         X_re = A_re + BW_re;
         X_im = A_im + BW_im;
         Y_re = A_re - BW_re;
         Y_im = A_im - BW_im;
     end
-    
 endmodule
 
-// ═══════════════════════════════════════════════════════════════════
-// TESTBENCH (Re-formatted to match 4pt, 8pt, and 16pt console style)
-// Compile: iverilog -g2012 -D TEST_FFT_2PT -o sim FFT_2pt.v && vvp sim
-// ═══════════════════════════════════════════════════════════════════
+// ── Testbench ──────────────────────────────────────────────────────────────
+// Compile: iverilog -D TEST_FFT_2PT -o build/sim FFT_2pt.v && vvp build/sim
+// ───────────────────────────────────────────────────────────────────────────
 `ifdef TEST_FFT_2PT
 module FFT_2pt_tb;
     reg  signed [15:0] A_re, A_im, B_re, B_im, W_re, W_im;
@@ -84,7 +57,7 @@ module FFT_2pt_tb;
 
     // ── Q15 constants ────────────────────────────────────────────
     localparam signed [15:0] POS1  =  32767;  // ≈ +1.0
-    localparam signed [15:0] NEG1  = -32767;  // ≈ -1.0
+    localparam signed [15:0] NEG1  = -32767;
     localparam signed [15:0] MONE  = -32768;  // exact -1.0
     localparam signed [15:0] ZERO  =      0;
     localparam signed [15:0] COS45 =  23170;  // ≈ cos(45°)

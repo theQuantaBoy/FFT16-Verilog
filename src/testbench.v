@@ -1,27 +1,14 @@
 // ═══════════════════════════════════════════════════════════════════
-// testbench.v  —  Self-checking testbench for the 16-point FFT
+// testbench.v — self-checking testbench for the 16-point FFT
 //
-// Compile & run:
-//   iverilog -g2012 -o sim_tb \
-//       testbench.v FFT_16pt.v FFT_8pt.v FFT_4pt.v FFT_2pt.v w_lut.v
-//   vvp sim_tb
+// 6 test vectors, all real inputs, tolerance ±64 LSBs:
+//   TC1: DC signal      TC2: Nyquist       TC3: Impulse at n=0
+//   TC4: Impulse at n=4 TC5: Cosine@bin2   TC6: Sawtooth
 //
-// Test cases (6 total, all purely real inputs):
-//   TC1  DC signal              — all energy in X[0]
-//   TC2  Nyquist signal         — all energy in X[8]
-//   TC3  Unit impulse at n=0    — flat spectrum (all bins equal)
-//   TC4  Impulse at n=4         — rotating ±1 / ±j spectrum
-//   TC5  Cosine at bin-2        — X[2]=X[14]=N/2·POS1, rest ≈0
-//   TC6  Sawtooth 0..POS1       — non-trivial multi-bin spectrum
-//
-// Pass/fail criterion:
-//   |got − expected| ≤ TOLERANCE for every (re, im) component.
-//   TOLERANCE = 64 LSBs covers the worst-case accumulated Q15
-//   truncation error across 4 butterfly stages (empirically ≤32 LSBs
-//   for all tested vectors; 64 gives safe headroom).
-//
-// Expected values were computed by numpy with POS1=32767 real inputs,
-// matching the exact integer DFT (no 1/N normalisation).
+// Hierarchical:
+//   iverilog -g2012 -o sim testbench.v FFT_16pt.v FFT_8pt.v FFT_4pt.v FFT_2pt.v w_lut.v
+// Flat (add -D USE_FLAT):
+//   iverilog -g2012 -D USE_FLAT -o sim testbench.v FFT_16pt_flat.v FFT_2pt.v w_lut.v
 // ═══════════════════════════════════════════════════════════════════
 
 `timescale 1ns/1ps
@@ -49,7 +36,12 @@ module testbench;
         out_re12, out_im12, out_re13, out_im13,
         out_re14, out_im14, out_re15, out_im15;
 
-    FFT_16pt #(.DW(16)) uut (
+    // ── DUT instantiation — switch with -D USE_FLAT ───────────────
+`ifdef USE_FLAT
+    FFT_16pt_flat #(.DW(16)) uut (
+`else
+    FFT_16pt      #(.DW(16)) uut (
+`endif
         .in_re0(in_re0),   .in_im0(in_im0),
         .in_re1(in_re1),   .in_im1(in_im1),
         .in_re2(in_re2),   .in_im2(in_im2),
@@ -85,33 +77,32 @@ module testbench;
     );
 
     // ── Q15 constants ────────────────────────────────────────────
+    // POS1=32767: max signed Q15 (≈+1.0; true +1.0 = 32768 overflows)
+    // NEG1=−32767: amplitude-symmetric with POS1 (use for signal values)
+    // MONE=−32768: exact Q15 −1.0 (use where precision matters)
     localparam signed [15:0] POS1  =  32767;
     localparam signed [15:0] NEG1  = -32767;
+    localparam signed [15:0] MONE  = -32768;
     localparam signed [15:0] ZERO  =      0;
     localparam signed [15:0] COS45 =  23170;  // round(32767 * cos(45°))
 
-    // ── Tolerance (LSBs, in the 20-bit output domain) ────────────
-    // Worst-case Q15 twiddle truncation over 4 stages is ≤ 32 LSBs.
-    // We set 64 for headroom.
+    // ── Tolerance ────────────────────────────────────────────────
+    // Q15 twiddle truncation accumulates ≤32 LSBs over 4 stages
+    // empirically; 64 gives comfortable headroom.
     localparam integer TOLERANCE = 64;
 
-    // ── Counters ─────────────────────────────────────────────────
     integer pass_cnt, fail_cnt;
 
-    // ── Working arrays (integer to hold signed 20-bit values) ────
-    // These are populated by capture_outputs and set_expected.
     integer got_re [0:15];
     integer got_im [0:15];
     integer exp_re [0:15];
     integer exp_im [0:15];
 
-    // ── Helper: real ↔ Q15 display ───────────────────────────────
     function real q15_to_real;
         input signed [19:0] val;
         q15_to_real = $itor(val) / 32768.0;
     endfunction
 
-    // ── Capture combinational DUT outputs into integer arrays ─────
     task capture_outputs;
         begin
             got_re[0]  = out_re0;  got_im[0]  = out_im0;
@@ -133,7 +124,6 @@ module testbench;
         end
     endtask
 
-    // ── Zero out all expected bins (useful before sparse assignments) ─
     task zero_expected;
         integer k;
         begin
@@ -143,10 +133,8 @@ module testbench;
         end
     endtask
 
-    // ── Check & report one test case ─────────────────────────────
-    // Call after setting inputs, waiting #SETTLE, and capture_outputs.
     task check_tc;
-        input [8*60:1] name;  // test-case label (up to 60 chars)
+        input [8*60:1] name;
         integer k;
         integer d_re, d_im;
         integer local_fails;
@@ -159,7 +147,6 @@ module testbench;
                 if (d_re < 0) d_re = -d_re;
                 if (d_im < 0) d_im = -d_im;
 
-                // Always print the full spectrum in float
                 $display("  X[%2d]: got %+8.3f%+8.3fj  |  exp %+8.3f%+8.3fj  %s",
                          k,
                          q15_to_real(got_re[k]), q15_to_real(got_im[k]),
@@ -172,39 +159,32 @@ module testbench;
             end
 
             if (local_fails == 0) begin
-                $display("  >>> PASS (all %0d bins within ±%0d LSBs)", 16, TOLERANCE);
+                $display("  >>> PASS (all %0d bins within +/-%0d LSBs)", 16, TOLERANCE);
                 pass_cnt = pass_cnt + 1;
             end else begin
-                $display("  >>> FAIL (%0d bin(s) exceeded ±%0d LSBs tolerance)", local_fails, TOLERANCE);
+                $display("  >>> FAIL (%0d bin(s) exceeded +/-%0d LSBs tolerance)", local_fails, TOLERANCE);
                 fail_cnt = fail_cnt + 1;
             end
         end
     endtask
 
-    // ── SETTLE: time for combinational circuit to resolve ─────────
-    // The design is fully combinational; any non-zero delay suffices.
     localparam SETTLE = 10;
 
-    // ═════════════════════════════════════════════════════════════
-    // MAIN TEST SEQUENCE
-    // ═════════════════════════════════════════════════════════════
     initial begin
         $dumpfile("testbench.vcd");
         $dumpvars(0, testbench);
 
         pass_cnt = 0; fail_cnt = 0;
 
-        $display("╔══════════════════════════════════════════════════════╗");
-        $display("║         FFT_16pt Self-Checking Testbench             ║");
-        $display("║  Input: Q15 (16-bit signed)   Output: 20-bit signed  ║");
-        $display("║  Tolerance: ±%0d LSBs                                 ║", TOLERANCE);
-        $display("╚══════════════════════════════════════════════════════╝");
+`ifdef USE_FLAT
+        $display("DUT: FFT_16pt_flat (32 x FFT_2pt, 4 explicit stages)");
+`else
+        $display("DUT: FFT_16pt (hierarchical: FFT_8pt -> FFT_4pt -> FFT_2pt)");
+`endif
+        $display("Tolerance: +/-%0d LSBs\n", TOLERANCE);
 
-        // ─────────────────────────────────────────────────────────
-        // TC1 — DC Signal: x[n]=POS1 for all n
-        //   Ideal: X[0]=16*POS1=524272, X[k]=0 for k≠0
-        //   This tests that all energy accumulates correctly in bin 0.
-        // ─────────────────────────────────────────────────────────
+        // ── TC1: DC Signal ────────────────────────────────────────
+        // All inputs = POS1; expect X[0] = 16*POS1, X[k]=0 for k≠0
         in_re0=POS1; in_im0=ZERO; in_re1=POS1;  in_im1=ZERO;
         in_re2=POS1; in_im2=ZERO; in_re3=POS1;  in_im3=ZERO;
         in_re4=POS1; in_im4=ZERO; in_re5=POS1;  in_im5=ZERO;
@@ -216,13 +196,10 @@ module testbench;
         #SETTLE; capture_outputs;
         zero_expected;
         exp_re[0] = 524272;
-        check_tc("TC1: DC Signal  x[n]=1  →  X[0]=16·POS1, rest=0");
+        check_tc("TC1: DC Signal  x[n]=1  ->  X[0]=16*POS1, rest=0");
 
-        // ─────────────────────────────────────────────────────────
-        // TC2 — Nyquist Alternating: x[n] = POS1 * (-1)^n
-        //   Ideal: X[8]=16*POS1, all others=0.
-        //   Validates the highest-frequency bin path.
-        // ─────────────────────────────────────────────────────────
+        // ── TC2: Nyquist ──────────────────────────────────────────
+        // x[n] = POS1 * (-1)^n; expect X[8] = 16*POS1, rest = 0
         in_re0=POS1; in_im0=ZERO; in_re1=NEG1;  in_im1=ZERO;
         in_re2=POS1; in_im2=ZERO; in_re3=NEG1;  in_im3=ZERO;
         in_re4=POS1; in_im4=ZERO; in_re5=NEG1;  in_im5=ZERO;
@@ -234,13 +211,10 @@ module testbench;
         #SETTLE; capture_outputs;
         zero_expected;
         exp_re[8] = 524272;
-        check_tc("TC2: Nyquist  x[n]=(-1)^n  →  X[8]=16·POS1, rest=0");
+        check_tc("TC2: Nyquist  x[n]=(-1)^n  ->  X[8]=16*POS1, rest=0");
 
-        // ─────────────────────────────────────────────────────────
-        // TC3 — Unit Impulse at n=0
-        //   Ideal: X[k]=POS1 for all k (flat spectrum).
-        //   Validates that all butterfly paths are active and balanced.
-        // ─────────────────────────────────────────────────────────
+        // ── TC3: Unit Impulse at n=0 ──────────────────────────────
+        // x[0]=POS1, rest=0; expect X[k]=POS1 for all k (flat spectrum)
         in_re0=POS1; in_im0=ZERO; in_re1=ZERO;  in_im1=ZERO;
         in_re2=ZERO; in_im2=ZERO; in_re3=ZERO;  in_im3=ZERO;
         in_re4=ZERO; in_im4=ZERO; in_re5=ZERO;  in_im5=ZERO;
@@ -256,16 +230,13 @@ module testbench;
                 exp_re[k] = 32767; exp_im[k] = 0;
             end
         end
-        check_tc("TC3: Impulse at n=0  →  X[k]=POS1 for all k");
+        check_tc("TC3: Impulse at n=0  ->  X[k]=POS1 for all k");
 
-        // ─────────────────────────────────────────────────────────
-        // TC4 — Impulse at n=4
-        //   X[k] = POS1 * e^{-j*2pi*4*k/16} = POS1 * (-j)^k
-        //   (rotates by exactly -90° per bin).
-        //   Validates twiddle factor correctness throughout.
-        //   k%4==0 → (+POS1, 0); k%4==1 → (0,-POS1);
-        //   k%4==2 → (-POS1, 0); k%4==3 → (0,+POS1)
-        // ─────────────────────────────────────────────────────────
+        // ── TC4: Impulse at n=4 ───────────────────────────────────
+        // X[k] = POS1 * e^{-j*2pi*4*k/16} = POS1 * (-j)^k
+        // Each bin rotates by -90 degrees relative to the previous.
+        // k%4==0 -> (+POS1,0); k%4==1 -> (0,-POS1);
+        // k%4==2 -> (-POS1,0); k%4==3 -> (0,+POS1)
         in_re0=ZERO; in_im0=ZERO; in_re1=ZERO;  in_im1=ZERO;
         in_re2=ZERO; in_im2=ZERO; in_re3=ZERO;  in_im3=ZERO;
         in_re4=POS1; in_im4=ZERO; in_re5=ZERO;  in_im5=ZERO;
@@ -275,7 +246,6 @@ module testbench;
         in_re12=ZERO; in_im12=ZERO; in_re13=ZERO; in_im13=ZERO;
         in_re14=ZERO; in_im14=ZERO; in_re15=ZERO; in_im15=ZERO;
         #SETTLE; capture_outputs;
-        // Expected: (-j)^k pattern — set with a loop using k%4
         begin : TC4_exp
             integer k;
             for (k = 0; k < 16; k = k + 1) begin
@@ -287,15 +257,12 @@ module testbench;
                 endcase
             end
         end
-        check_tc("TC4: Impulse at n=4  →  X[k]=POS1·(-j)^k  (twiddle stress)");
+        check_tc("TC4: Impulse at n=4  ->  X[k]=POS1*(-j)^k  (twiddle stress)");
 
-        // ─────────────────────────────────────────────────────────
-        // TC5 — Real cosine at bin 2: x[n] = round(POS1·cos(2π·2n/16))
-        //   Ideal: X[2] = X[14] = N/2·POS1 = 262137, rest ≈ 0.
-        //   Validates multi-stage real-signal symmetry.
-        //   Note: X[6] and X[10] will be ≈ -1 (rounding artifact);
-        //   this is expected and within tolerance.
-        // ─────────────────────────────────────────────────────────
+        // ── TC5: Cosine at bin 2 ──────────────────────────────────
+        // x[n] = round(POS1 * cos(2*pi*2*n/16))
+        // X[2] = X[14] = 262137; all others ~0.
+        // X[6] and X[10] are -1 due to COS45 rounding, within tolerance.
         in_re0= POS1; in_im0=ZERO; in_re1= COS45; in_im1=ZERO;
         in_re2= ZERO; in_im2=ZERO; in_re3=-COS45; in_im3=ZERO;
         in_re4=-POS1; in_im4=ZERO; in_re5=-COS45; in_im5=ZERO;
@@ -307,15 +274,12 @@ module testbench;
         #SETTLE; capture_outputs;
         zero_expected;
         exp_re[2]  = 262137; exp_re[14] = 262137;
-        exp_re[6]  = -1;     exp_re[10] = -1;    // rounding artifact, ≪ TOLERANCE
-        check_tc("TC5: Cosine@bin2  →  X[2]=X[14]=262137, rest≈0");
+        exp_re[6]  = -1;     exp_re[10] = -1;
+        check_tc("TC5: Cosine@bin2  ->  X[2]=X[14]=262137, rest~0");
 
-        // ─────────────────────────────────────────────────────────
-        // TC6 — Sawtooth 0..POS1: x[n] = round(POS1·n/15)
-        //   Non-trivial spectrum with significant energy in all bins.
-        //   Expected values computed by numpy. Tests broad numerical
-        //   correctness, not just peak-bin cases.
-        // ─────────────────────────────────────────────────────────
+        // ── TC6: Sawtooth ─────────────────────────────────────────
+        // x[n] = round(POS1 * n / 15), a ramp from 0 to POS1.
+        // Non-trivial multi-bin spectrum; expected values from numpy.
         in_re0=    0; in_im0=ZERO; in_re1= 2184; in_im1=ZERO;
         in_re2= 4369; in_im2=ZERO; in_re3= 6553; in_im3=ZERO;
         in_re4= 8738; in_im4=ZERO; in_re5=10922; in_im5=ZERO;
@@ -343,17 +307,12 @@ module testbench;
         exp_re[15] =  -17476; exp_im[15] =  -87858;
         check_tc("TC6: Sawtooth 0..POS1  (multi-bin stress test)");
 
-        // ─────────────────────────────────────────────────────────
-        // Summary
-        // ─────────────────────────────────────────────────────────
-        $display("\n╔══════════════════════════════════════════════════════╗");
-        $display("║  SUMMARY: %0d / %0d test cases PASSED                    ║",
-                 pass_cnt, pass_cnt + fail_cnt);
+        // ── Summary ───────────────────────────────────────────────
+        $display("\nSUMMARY: %0d / %0d test cases PASSED", pass_cnt, pass_cnt + fail_cnt);
         if (fail_cnt == 0)
-            $display("║  All tests PASSED.                                   ║");
+            $display("All tests PASSED.");
         else
-            $display("║  %0d test case(s) FAILED.                             ║", fail_cnt);
-        $display("╚══════════════════════════════════════════════════════╝");
+            $display("%0d test case(s) FAILED.", fail_cnt);
 
         $finish;
     end
