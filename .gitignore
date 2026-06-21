@@ -10,3 +10,5 @@ test/inputs.hex
 
 # Ignore generic Icarus Verilog compiled output names if you use defaults
 a.out
+
+DSD_mid_q2_latex/
